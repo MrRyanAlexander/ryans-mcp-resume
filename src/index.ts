@@ -329,6 +329,12 @@ export class MyMCP extends McpAgent {
 
 	// Phase 2: track which discovery questions have been asked this session
 	private askedQuestions = new Set<string>();
+
+	// Phase 4: log what we learn about the company
+	private companyAnswers = new Map<
+		string,
+		{ question: string; answer: string; category: string; timestamp: string }
+	>();
 	async init() {
 		// --- Tool: get_background ---
 		this.server.tool(
@@ -592,24 +598,28 @@ export class MyMCP extends McpAgent {
 					.split(/\s+/)
 					.filter((w) => w.length > 3);
 
-				// Search background for each keyword, deduplicate results
-				const seen = new Set<string>();
-				const backgroundHits: string[] = [];
-				for (const kw of keywords) {
-					const result = searchBackground(kw);
-					if (!result.startsWith("No specific info") && !seen.has(result)) {
-						seen.add(result);
-						backgroundHits.push(result);
-					}
-				}
-
-				// Also try the full question as a phrase search using key nouns
+				// Also include topic keywords
 				const topicGuess = conversation_topic || interviewer_question;
-				const phraseResult = searchBackground(
-					topicGuess.split(/\s+/).filter((w) => w.length > 4).slice(0, 2).join(" "),
-				);
-				if (!phraseResult.startsWith("No specific info") && !seen.has(phraseResult)) {
-					backgroundHits.push(phraseResult);
+				const topicKeywords = topicGuess
+					.toLowerCase()
+					.split(/\s+/)
+					.filter((w) => w.length > 4);
+				const allKeywords = [...new Set([...keywords, ...topicKeywords])];
+
+				// Search background for each keyword, deduplicate individual entries
+				const seenEntries = new Set<string>();
+				const backgroundHits: string[] = [];
+				for (const kw of allKeywords) {
+					const result = searchBackground(kw);
+					if (result.startsWith("No specific info")) continue;
+					// searchBackground returns entries joined by \n\n — split and dedupe
+					for (const entry of result.split("\n\n")) {
+						const trimmed = entry.trim();
+						if (trimmed && !seenEntries.has(trimmed)) {
+							seenEntries.add(trimmed);
+							backgroundHits.push(trimmed);
+						}
+					}
 				}
 
 				const answerSection =
@@ -812,6 +822,201 @@ export class MyMCP extends McpAgent {
 						}
 						sections.push(``);
 					}
+				}
+
+				return { content: [{ type: "text", text: sections.join("\n") }] };
+			},
+		);
+
+		// ========================================================
+		// PHASE 4 TOOLS: Interview Logger
+		// ========================================================
+
+		// --- Tool: log_company_answer ---
+		this.server.tool(
+			"log_company_answer",
+			"Store a company's response to one of the candidate's discovery questions. " +
+				"Call this whenever the company answers a question so the candidate can review " +
+				"everything later. Returns a confirmation with the current log count.",
+			{
+				question_id: z
+					.string()
+					.optional()
+					.describe(
+						"The discovery question ID (e.g. 'tech-1', 'team-2') if the answer maps " +
+							"to a known question. Leave empty for ad-hoc info.",
+					),
+				question_text: z
+					.string()
+					.describe("The question that was asked (or the topic the info relates to)."),
+				company_answer: z
+					.string()
+					.describe("What the company said — summarize or quote their response."),
+				category: z
+					.string()
+					.optional()
+					.describe(
+						"Category this falls under (e.g. 'tech_stack', 'team_and_culture'). " +
+							"Will be auto-detected from question_id if provided.",
+					),
+			},
+			async ({ question_id, question_text, company_answer, category }) => {
+				// Auto-detect category from question_id if not provided
+				let resolvedCategory = category || "general";
+				if (question_id && !category) {
+					for (const [cat, questions] of Object.entries(DISCOVERY_QUESTIONS)) {
+						if (questions.some((q) => q.id === question_id)) {
+							resolvedCategory = cat;
+							break;
+						}
+					}
+				}
+
+				// Generate a key — use the question_id if we have one, otherwise a timestamp-based key
+				const key = question_id || `adhoc-${Date.now()}`;
+				const timestamp = new Date().toISOString();
+
+				this.companyAnswers.set(key, {
+					question: question_text,
+					answer: company_answer,
+					category: resolvedCategory,
+					timestamp,
+				});
+
+				const totalLogged = this.companyAnswers.size;
+
+				return {
+					content: [
+						{
+							type: "text",
+							text:
+								`✓ Logged company response.\n\n` +
+								`**Question:** ${question_text}\n` +
+								`**Category:** ${resolvedCategory.replace(/_/g, " ")}\n` +
+								`**Key:** ${key}\n\n` +
+								`_${totalLogged} company response${totalLogged === 1 ? "" : "s"} logged this session._`,
+						},
+					],
+				};
+			},
+		);
+
+		// --- Tool: get_interview_summary ---
+		this.server.tool(
+			"get_interview_summary",
+			"Returns a full summary of the interview session: what discovery questions were asked, " +
+				"what the company revealed, and what topics are still unanswered. Use at the end of " +
+				"an interview to give the candidate a debrief.",
+			{},
+			async () => {
+				const totalDiscovery = Object.values(DISCOVERY_QUESTIONS).flat().length;
+				const totalAsked = this.askedQuestions.size;
+				const totalLogged = this.companyAnswers.size;
+				const totalRemaining = totalDiscovery - totalAsked;
+
+				const sections: string[] = [
+					`# Interview Summary for ${PROFILE.name}`,
+					``,
+					`**Discovery questions asked:** ${totalAsked}/${totalDiscovery}`,
+					`**Company responses logged:** ${totalLogged}`,
+					`**Questions remaining:** ${totalRemaining}`,
+					``,
+				];
+
+				// --- Section: What we learned ---
+				if (totalLogged > 0) {
+					sections.push(`---`, `## What the Company Revealed`, ``);
+
+					// Group logged answers by category
+					const byCategory = new Map<
+						string,
+						{ key: string; question: string; answer: string; timestamp: string }[]
+					>();
+
+					for (const [key, entry] of this.companyAnswers) {
+						const cat = entry.category;
+						if (!byCategory.has(cat)) byCategory.set(cat, []);
+						byCategory.get(cat)!.push({ key, ...entry });
+					}
+
+					for (const [cat, entries] of byCategory) {
+						const label = cat.replace(/_/g, " ").toUpperCase();
+						sections.push(`### ${label}`);
+						for (const e of entries) {
+							sections.push(
+								`**Q:** ${e.question}`,
+								`**A:** ${e.answer}`,
+								``,
+							);
+						}
+					}
+				} else {
+					sections.push(
+						`---`,
+						`## Company Responses`,
+						``,
+						`No company responses have been logged yet. Use \`log_company_answer\` to record ` +
+							`what the company tells you during the interview.`,
+						``,
+					);
+				}
+
+				// --- Section: What's still unanswered ---
+				const unanswered: { category: string; question: string }[] = [];
+				for (const [cat, questions] of Object.entries(DISCOVERY_QUESTIONS)) {
+					for (const q of questions) {
+						if (!this.askedQuestions.has(q.id)) {
+							unanswered.push({ category: cat, question: q.question });
+						}
+					}
+				}
+
+				if (unanswered.length > 0) {
+					sections.push(`---`, `## Still Unanswered`, ``);
+					let currentCat = "";
+					for (const u of unanswered) {
+						if (u.category !== currentCat) {
+							currentCat = u.category;
+							sections.push(`### ${currentCat.replace(/_/g, " ").toUpperCase()}`);
+						}
+						sections.push(`  ○ ${u.question}`);
+					}
+					sections.push(``);
+				} else {
+					sections.push(
+						`---`,
+						`## Coverage`,
+						``,
+						`All discovery questions have been asked this session. Nice work.`,
+						``,
+					);
+				}
+
+				// --- Section: Questions asked (without answers logged) ---
+				const askedButNotLogged: string[] = [];
+				for (const id of this.askedQuestions) {
+					if (!this.companyAnswers.has(id)) {
+						// Find the question text
+						for (const questions of Object.values(DISCOVERY_QUESTIONS)) {
+							const match = questions.find((q) => q.id === id);
+							if (match) {
+								askedButNotLogged.push(match.question);
+								break;
+							}
+						}
+					}
+				}
+
+				if (askedButNotLogged.length > 0) {
+					sections.push(
+						`---`,
+						`## Asked but No Response Logged`,
+						``,
+						`These questions were asked but the company's answer wasn't captured:`,
+						...askedButNotLogged.map((q) => `  ⚠ ${q}`),
+						``,
+						`_Consider using \`log_company_answer\` to capture these if you have the info._`,
+					);
 				}
 
 				return { content: [{ type: "text", text: sections.join("\n") }] };
