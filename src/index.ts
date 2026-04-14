@@ -333,7 +333,10 @@ export class MyMCP extends McpAgent {
 		// --- Tool: get_background ---
 		this.server.tool(
 			"get_background",
-			"Search the candidate's background by topic. Returns matching skills, projects, and experience. Try keywords like 'typescript', 'ai', 'automation', 'react', 'python', 'backend'.",
+			"Search the candidate's background by topic. " +
+				"NOTE: For interview conversations, prefer the respond_and_ask tool instead — it bundles " +
+				"background info with a strategic follow-up question. Use this tool only when you need " +
+				"raw background data without the interview flow.",
 			{ topic: z.string().describe("Keyword to search across skills, projects, and experience") },
 			async ({ topic }) => ({
 				content: [{ type: "text", text: searchBackground(topic) }],
@@ -343,7 +346,7 @@ export class MyMCP extends McpAgent {
 		// --- Tool: list_skills ---
 		this.server.tool(
 			"list_skills",
-			"List all skill categories and skills. Returns a structured overview of the candidate's technical abilities.",
+			"List all skill categories and skills. A reference tool — use respond_and_ask for interview Q&A.",
 			{},
 			async () => {
 				const lines: string[] = [];
@@ -362,7 +365,7 @@ export class MyMCP extends McpAgent {
 		// --- Tool: get_project_detail ---
 		this.server.tool(
 			"get_project_detail",
-			"Get detailed information about a specific project. Use list_skills or get_background first to discover project names.",
+			"Get detailed information about a specific project. A reference tool — use respond_and_ask for interview Q&A.",
 			{
 				project_name: z.string().describe(
 					"Project name (e.g. 'reverse-interview-mcp', 'internal-dashboard', 'automation-pipeline')",
@@ -405,7 +408,8 @@ export class MyMCP extends McpAgent {
 		// --- Tool: get_profile ---
 		this.server.tool(
 			"get_profile",
-			"Get the candidate's profile summary, title, location, and links.",
+			"Get the candidate's profile summary, title, location, and links. " +
+				"A reference tool — use respond_and_ask for interview Q&A.",
 			{},
 			async () => {
 				const text = [
@@ -474,7 +478,9 @@ export class MyMCP extends McpAgent {
 		this.server.tool(
 			"get_discovery_question",
 			"Get the next unasked discovery question for a given category (or any category if not specified). " +
-				"Marks the question as asked. Categories: tech_stack, team_and_culture, role_and_growth, " +
+				"Marks the question as asked. NOTE: During interview conversations, prefer respond_and_ask — " +
+				"it pairs background answers with discovery questions automatically. Use this tool only when " +
+				"you need a standalone question. Categories: tech_stack, team_and_culture, role_and_growth, " +
 				"remote_and_logistics, process_and_standards.",
 			{
 				category: z
@@ -563,9 +569,10 @@ export class MyMCP extends McpAgent {
 		// --- Tool: respond_and_ask ---
 		this.server.tool(
 			"respond_and_ask",
-			"The core 'reverse interview' tool. Takes the interviewer's question, returns the candidate's " +
-				"answer AND a strategically chosen follow-up question for the company. Use this instead of " +
-				"calling get_background and get_discovery_question separately — it bundles the strategy.",
+			"PRIMARY TOOL — Use this for any interview question about the candidate. Takes the interviewer's " +
+				"question, returns the candidate's relevant background AND a strategically chosen follow-up " +
+				"question for the company. This is the default tool for interview conversations. Other tools " +
+				"(get_background, list_skills, etc.) are reference helpers — start here.",
 			{
 				interviewer_question: z
 					.string()
