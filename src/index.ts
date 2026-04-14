@@ -52,7 +52,7 @@ const SKILLS: Record<string, Record<string, Skill>> = {
 	ai_tools: {
 		Claude: { level: "expert", years: 2, notes: "Primary AI tool — prompt engineering, agent orchestration, MCP development" },
 		Gemini: { level: "proficient", years: 1, notes: "Multi-model workflows" },
-		OpenAi: { level: "proficient", years: 2, notes: "General AI-assisted development" },
+		ChatGPT: { level: "proficient", years: 2, notes: "General AI-assisted development" },
 		"Prompt Engineering": { level: "expert", years: 2, notes: "Systematic prompt design for complex workflows" },
 		"AI Agent Orchestration": { level: "proficient", years: 1, notes: "Multi-agent coordination systems" },
 	},
@@ -89,6 +89,8 @@ const PROJECTS: Record<string, Project> = {
 		],
 		role: "Solo — architect, developer, and validator",
 		year: 2026,
+		repo: "https://github.com/MrRyanAlexander/api",
+		docs: "https://docs.google.com/document/d/18ryHvfW2KFs4p-tw7IRjxh3XCFWzOSMb/edit",
 	},
 	"reverse-interview-mcp": {
 		description:
@@ -102,27 +104,155 @@ const PROJECTS: Record<string, Project> = {
 		],
 		role: "Solo developer",
 		year: 2026,
+		repo: "https://github.com/MrRyanAlexander/ryans-mcp-resume",
 	},
 };
 
 const EXPERIENCE = [
 	{
-		title: "Full-Stack Developer",
-		company: "Self-Employed / Contract",
-		period: "2022 – Present",
-		summary:
-			"Building AI-powered tools, automation pipelines, and internal dashboards for small teams. " +
-			"Focus on shipping fast with TypeScript, Cloudflare Workers, and LLM integrations.",
+		company: "Tetra Tech, Inc.",
+		location: "Remote / Field Deployments to NC, FL, TX an LA",
+		roles: [
+			{
+				title: "Lead Data Manager",
+				period: "Sep 2021 – Sep 2025",
+				highlights: [
+					"Ran daily data operations for the PPDR wind program across two Louisiana parishes as the lead data manager — handling contract setup, field ticket configuration, error resolution, and approving client reports.",
+					"Managed up to six data managers simultaneously across active programs, setting daily priorities and resolving field data issues that blocked billing or FEMA submission.",
+					"Worked daily with the company FEMA subject matter expert and Regional Operations PM; joined stakeholder calls to explain field data decisions and eligibility edge cases.",
+					"Trained incoming data managers on operational systems, ticket workflows, GPS correction procedures, and FEMA documentation standards.",
+					"Reviewed field data for FEMA eligibility across 10,000+ records in 20+ counties, identifying documentation gaps before audit review.",
+					"The person PMs knew they could count on for quick answers and reliable data — got called back to project after project over 7 years because of that reliability.",
+				],
+			},
+			{
+				title: "Data Manager",
+				period: "Sep 2018 – Sep 2021 (seasonal)",
+				highlights: [
+					"Managed field data operations across hurricane deployments in NC, FL, TX, and LA - monitoring error dashboards, correcting GPS and ticket data, coordinating with field supervisors, and submitting nightly reports to the client.",
+					"Verified FEMA eligibility by cross-referencing field evidence, property records, and county GIS data against Stafford Act and 2 CFR Part 200 requirements.",
+					"Compiled FEMA Project Worksheet documentation packages including photo evidence, property data, and EHP review materials across 4 federally declared disasters.",
+				],
+			},
+		],
 	},
 	{
-		title: "Software Developer",
-		company: "Previous Company",
-		period: "2019 – 2022",
-		summary:
-			"Developed and maintained web applications and backend services. " +
-			"Led migration from legacy PHP to Node.js/React stack.",
+		company: "Clegg's Termite & Pest Control",
+		location: "New Bern, NC",
+		roles: [
+			{
+				title: "Sales & Inspection Associate",
+				period: "Dec 2015 – Sep 2018",
+				highlights: [
+					"Customer-facing sales role focused on building trust and educating homeowners about moisture-related issues — the primary driver of pest problems, since most pests rely on water and a food source to survive.",
+					"Conducted inspections, explained findings in plain language, and closed sales by focusing on what the customer actually needed rather than pushing product.",
+				],
+			},
+		],
 	},
 ];
+
+const EDUCATION = [
+	{
+		name: "Startup Engineering",
+		instructor: "Balaji Srinivasan",
+		year: 2013,
+		notes: "Online course that sparked a long-term interest in building software. I started learning to code around this time. Before that I only tinkered with HTML, even using Dreamweaver in the early days.",
+	},
+	{
+		name: "Self-Directed Study",
+		period: "2012 – Present",
+		notes: "Ongoing study in data systems, computer science: AI tooling, automation, and development. While I have no formal CS degree, I've learned by building things.",
+	},
+];
+
+// ============================================================
+// DISCOVERY QUESTIONS — What YOU want to learn about the company
+// ============================================================
+
+interface DiscoveryQuestion {
+	id: string;
+	question: string;
+	why: string; // why this matters to the candidate
+}
+
+const DISCOVERY_QUESTIONS: Record<string, DiscoveryQuestion[]> = {
+	tech_stack: [
+		{
+			id: "tech-1",
+			question: "What does the current tech stack look like — languages, frameworks, infra?",
+			why: "Need to gauge how much ramp-up vs. immediate contribution is realistic.",
+		},
+		{
+			id: "tech-2",
+			question: "How are deployment pipelines set up? CI/CD, staging environments, rollback procedures?",
+			why: "Tells me how mature the engineering org is operationally.",
+		},
+		{
+			id: "tech-3",
+			question: "How is the team approaching AI/LLM tooling internally — experimenting, adopting, or waiting?",
+			why: "This is where I can add the most value fastest. Want to know if there's appetite for it.",
+		},
+	],
+	team_and_culture: [
+		{
+			id: "team-1",
+			question: "How big is the team I'd be working with, and how are responsibilities divided?",
+			why: "Need to understand if this is a 'wear many hats' role or a specialized one.",
+		},
+		{
+			id: "team-2",
+			question: "What does a typical day or week look like for someone in this role?",
+			why: "Best way to understand the actual job vs. the job description.",
+		},
+		{
+			id: "team-3",
+			question: "How does the team handle disagreements on technical direction?",
+			why: "Reveals decision-making culture — top-down vs. collaborative.",
+		},
+	],
+	role_and_growth: [
+		{
+			id: "role-1",
+			question: "What does success look like in the first 90 days?",
+			why: "Shows whether expectations are realistic and well-defined.",
+		},
+		{
+			id: "role-2",
+			question: "What's the biggest challenge the team is facing right now that this role would help with?",
+			why: "Tells me the real reason they're hiring — not the polished version.",
+		},
+		{
+			id: "role-3",
+			question: "Is there room to grow into architecture or leadership, or is this a heads-down IC role long-term?",
+			why: "Want to know the ceiling before I commit.",
+		},
+	],
+	remote_and_logistics: [
+		{
+			id: "remote-1",
+			question: "What's the remote/hybrid/on-site situation, and is that likely to change?",
+			why: "Based in St. Louis — need to know what flexibility looks like.",
+		},
+		{
+			id: "remote-2",
+			question: "What tools does the team use for async communication and collaboration?",
+			why: "Good async tooling signals a team that knows how to work distributed.",
+		},
+	],
+	process_and_standards: [
+		{
+			id: "process-1",
+			question: "How does code review work? What's the bar for shipping?",
+			why: "Tells me how much autonomy vs. oversight to expect.",
+		},
+		{
+			id: "process-2",
+			question: "How are on-call or incident response responsibilities handled?",
+			why: "Need to know what the after-hours commitment looks like.",
+		},
+	],
+};
 
 // ============================================================
 // HELPER: search resume data by topic keyword
@@ -156,8 +286,22 @@ function searchBackground(topic: string): string {
 
 	// Search experience
 	for (const exp of EXPERIENCE) {
-		if (exp.summary.toLowerCase().includes(t) || exp.title.toLowerCase().includes(t)) {
-			results.push(`[Experience] ${exp.title} at ${exp.company} (${exp.period}): ${exp.summary}`);
+		for (const role of exp.roles) {
+			const allText = [role.title, exp.company, ...role.highlights].join(" ").toLowerCase();
+			if (allText.includes(t)) {
+				results.push(
+					`[Experience] ${role.title} at ${exp.company} (${role.period}):\n` +
+						role.highlights.map((h) => `  • ${h}`).join("\n"),
+				);
+			}
+		}
+	}
+
+	// Search education
+	for (const edu of EDUCATION) {
+		const eduText = [edu.name, edu.notes].join(" ").toLowerCase();
+		if (eduText.includes(t)) {
+			results.push(`[Education] ${edu.name} — ${edu.notes}`);
 		}
 	}
 
@@ -183,6 +327,8 @@ export class MyMCP extends McpAgent {
 		version: "1.0.0",
 	});
 
+	// Phase 2: track which discovery questions have been asked this session
+	private askedQuestions = new Set<string>();
 	async init() {
 		// --- Tool: get_background ---
 		this.server.tool(
@@ -272,12 +418,141 @@ export class MyMCP extends McpAgent {
 					...Object.entries(PROFILE.links).map(([k, v]) => `  • ${k}: ${v}`),
 					``,
 					`## Experience`,
-					...EXPERIENCE.map(
-						(e) => `  • ${e.title} at ${e.company} (${e.period})\n    ${e.summary}`,
+					...EXPERIENCE.flatMap((e) =>
+						e.roles.map(
+							(r) => `  • ${r.title} at ${e.company} (${r.period})`,
+						),
+					),
+					``,
+					`## Education`,
+					...EDUCATION.map(
+						(e) => `  • ${e.name}${"instructor" in e ? ` (${e.instructor})` : ""} — ${e.notes}`,
 					),
 				].join("\n");
 
 				return { content: [{ type: "text", text }] };
+			},
+		);
+
+		// ========================================================
+		// PHASE 2 TOOLS: Discovery Questions
+		// ========================================================
+
+		// --- Tool: get_all_discovery_topics ---
+		this.server.tool(
+			"get_all_discovery_topics",
+			"List all discovery question categories and how many questions remain unasked in each. " +
+				"Use this to see what the candidate still wants to learn about the company.",
+			{},
+			async () => {
+				const lines: string[] = [`# Discovery Topics for ${PROFILE.name}\n`];
+
+				for (const [category, questions] of Object.entries(DISCOVERY_QUESTIONS)) {
+					const remaining = questions.filter((q) => !this.askedQuestions.has(q.id));
+					const label = category.replace(/_/g, " ").toUpperCase();
+					lines.push(
+						`## ${label}  (${remaining.length}/${questions.length} remaining)`,
+					);
+					for (const q of questions) {
+						const status = this.askedQuestions.has(q.id) ? "✓ asked" : "○ pending";
+						lines.push(`  ${status} — ${q.question}`);
+					}
+					lines.push("");
+				}
+
+				const totalRemaining = Object.values(DISCOVERY_QUESTIONS)
+					.flat()
+					.filter((q) => !this.askedQuestions.has(q.id)).length;
+
+				lines.push(`---\n**${totalRemaining} questions remaining overall.**`);
+
+				return { content: [{ type: "text", text: lines.join("\n") }] };
+			},
+		);
+
+		// --- Tool: get_discovery_question ---
+		this.server.tool(
+			"get_discovery_question",
+			"Get the next unasked discovery question for a given category (or any category if not specified). " +
+				"Marks the question as asked. Categories: tech_stack, team_and_culture, role_and_growth, " +
+				"remote_and_logistics, process_and_standards.",
+			{
+				category: z
+					.string()
+					.optional()
+					.describe(
+						"Category to pull from (e.g. 'tech_stack', 'team_and_culture'). " +
+							"Leave empty to get the next question from any category.",
+					),
+				context: z
+					.string()
+					.optional()
+					.describe(
+						"Optional: the current conversation topic. Helps pick the most relevant question.",
+					),
+			},
+			async ({ category, context }) => {
+				let pool: { category: string; question: DiscoveryQuestion }[] = [];
+
+				if (category && DISCOVERY_QUESTIONS[category]) {
+					// Pull from the specified category
+					pool = DISCOVERY_QUESTIONS[category]
+						.filter((q) => !this.askedQuestions.has(q.id))
+						.map((q) => ({ category, question: q }));
+				} else {
+					// Pull from all categories
+					for (const [cat, questions] of Object.entries(DISCOVERY_QUESTIONS)) {
+						for (const q of questions) {
+							if (!this.askedQuestions.has(q.id)) {
+								pool.push({ category: cat, question: q });
+							}
+						}
+					}
+				}
+
+				if (pool.length === 0) {
+					const scope = category ? `the "${category}" category` : "any category";
+					return {
+						content: [
+							{
+								type: "text",
+								text: `All discovery questions in ${scope} have been asked this session. ` +
+									`Use get_all_discovery_topics to see the full status.`,
+							},
+						],
+					};
+				}
+
+				// If context is provided, do a basic keyword relevance match
+				let pick = pool[0];
+				if (context) {
+					const ctx = context.toLowerCase();
+					const scored = pool.map((entry) => {
+						const text = (entry.question.question + " " + entry.question.why).toLowerCase();
+						const words = ctx.split(/\s+/);
+						const hits = words.filter((w) => w.length > 3 && text.includes(w)).length;
+						return { entry, hits };
+					});
+					scored.sort((a, b) => b.hits - a.hits);
+					pick = scored[0].entry;
+				}
+
+				// Mark as asked
+				this.askedQuestions.add(pick.question.id);
+
+				const totalRemaining = Object.values(DISCOVERY_QUESTIONS)
+					.flat()
+					.filter((q) => !this.askedQuestions.has(q.id)).length;
+
+				const output = [
+					`**Category:** ${pick.category.replace(/_/g, " ")}`,
+					`**Question:** ${pick.question.question}`,
+					`**Why this matters to ${PROFILE.name}:** ${pick.question.why}`,
+					``,
+					`_${totalRemaining} discovery questions remaining this session._`,
+				].join("\n");
+
+				return { content: [{ type: "text", text: output }] };
 			},
 		);
 	}
