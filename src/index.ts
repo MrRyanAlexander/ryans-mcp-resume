@@ -555,6 +555,261 @@ export class MyMCP extends McpAgent {
 				return { content: [{ type: "text", text: output }] };
 			},
 		);
+
+		// ========================================================
+		// PHASE 3 TOOLS: Quid Pro Quo Strategy
+		// ========================================================
+
+		// --- Tool: respond_and_ask ---
+		this.server.tool(
+			"respond_and_ask",
+			"The core 'reverse interview' tool. Takes the interviewer's question, returns the candidate's " +
+				"answer AND a strategically chosen follow-up question for the company. Use this instead of " +
+				"calling get_background and get_discovery_question separately — it bundles the strategy.",
+			{
+				interviewer_question: z
+					.string()
+					.describe("The question the interviewer just asked."),
+				conversation_topic: z
+					.string()
+					.optional()
+					.describe(
+						"Optional: the broad topic of conversation (e.g. 'technical skills', 'team culture'). " +
+							"Helps pick a more relevant follow-up question.",
+					),
+			},
+			async ({ interviewer_question, conversation_topic }) => {
+				// --- PART 1: Build the candidate's answer ---
+				const keywords = interviewer_question
+					.toLowerCase()
+					.split(/\s+/)
+					.filter((w) => w.length > 3);
+
+				// Search background for each keyword, deduplicate results
+				const seen = new Set<string>();
+				const backgroundHits: string[] = [];
+				for (const kw of keywords) {
+					const result = searchBackground(kw);
+					if (!result.startsWith("No specific info") && !seen.has(result)) {
+						seen.add(result);
+						backgroundHits.push(result);
+					}
+				}
+
+				// Also try the full question as a phrase search using key nouns
+				const topicGuess = conversation_topic || interviewer_question;
+				const phraseResult = searchBackground(
+					topicGuess.split(/\s+/).filter((w) => w.length > 4).slice(0, 2).join(" "),
+				);
+				if (!phraseResult.startsWith("No specific info") && !seen.has(phraseResult)) {
+					backgroundHits.push(phraseResult);
+				}
+
+				const answerSection =
+					backgroundHits.length > 0
+						? backgroundHits.join("\n\n")
+						: `No direct match found for this question in the candidate's data. ` +
+							`${PROFILE.name} may want to answer this one personally.`;
+
+				// --- PART 2: Pick a strategic follow-up question ---
+				// Map interviewer topics to discovery categories
+				const topicCategoryMap: Record<string, string[]> = {
+					technical: ["tech_stack", "process_and_standards"],
+					tech: ["tech_stack", "process_and_standards"],
+					stack: ["tech_stack"],
+					code: ["tech_stack", "process_and_standards"],
+					team: ["team_and_culture"],
+					culture: ["team_and_culture"],
+					people: ["team_and_culture"],
+					role: ["role_and_growth"],
+					growth: ["role_and_growth"],
+					career: ["role_and_growth"],
+					remote: ["remote_and_logistics"],
+					hybrid: ["remote_and_logistics"],
+					onsite: ["remote_and_logistics"],
+					process: ["process_and_standards"],
+					review: ["process_and_standards"],
+					deploy: ["tech_stack", "process_and_standards"],
+				};
+
+				// Find the best discovery category based on the question
+				const questionLower = (interviewer_question + " " + (conversation_topic || "")).toLowerCase();
+				let targetCategories: string[] = [];
+				for (const [keyword, cats] of Object.entries(topicCategoryMap)) {
+					if (questionLower.includes(keyword)) {
+						targetCategories.push(...cats);
+					}
+				}
+				// Deduplicate
+				targetCategories = [...new Set(targetCategories)];
+
+				// Find an unasked question, preferring matched categories
+				let followUp: { category: string; question: DiscoveryQuestion } | null = null;
+
+				// First try: matched categories
+				for (const cat of targetCategories) {
+					if (DISCOVERY_QUESTIONS[cat]) {
+						const unasked = DISCOVERY_QUESTIONS[cat].find(
+							(q) => !this.askedQuestions.has(q.id),
+						);
+						if (unasked) {
+							followUp = { category: cat, question: unasked };
+							break;
+						}
+					}
+				}
+
+				// Fallback: any unasked question
+				if (!followUp) {
+					for (const [cat, questions] of Object.entries(DISCOVERY_QUESTIONS)) {
+						const unasked = questions.find((q) => !this.askedQuestions.has(q.id));
+						if (unasked) {
+							followUp = { category: cat, question: unasked };
+							break;
+						}
+					}
+				}
+
+				// Mark the follow-up as asked
+				if (followUp) {
+					this.askedQuestions.add(followUp.question.id);
+				}
+
+				// --- BUILD OUTPUT ---
+				const totalRemaining = Object.values(DISCOVERY_QUESTIONS)
+					.flat()
+					.filter((q) => !this.askedQuestions.has(q.id)).length;
+
+				const sections: string[] = [
+					`# Respond & Ask — Quid Pro Quo`,
+					``,
+					`**Interviewer asked:** "${interviewer_question}"`,
+					``,
+					`---`,
+					`## ${PROFILE.name}'s Relevant Background`,
+					``,
+					answerSection,
+					``,
+					`---`,
+				];
+
+				if (followUp) {
+					sections.push(
+						`## Suggested Follow-Up Question for the Company`,
+						``,
+						`**Category:** ${followUp.category.replace(/_/g, " ")}`,
+						`**Ask:** "${followUp.question.question}"`,
+						`**Why this matters to ${PROFILE.name}:** ${followUp.question.why}`,
+						``,
+						`_${totalRemaining} discovery questions remaining._`,
+					);
+				} else {
+					sections.push(
+						`## Follow-Up`,
+						``,
+						`All discovery questions have been asked this session. No follow-up needed.`,
+					);
+				}
+
+				return { content: [{ type: "text", text: sections.join("\n") }] };
+			},
+		);
+
+		// --- Tool: conversation_strategy ---
+		this.server.tool(
+			"conversation_strategy",
+			"Given the current conversation topic, suggests what the candidate should ask next " +
+				"and why. Does NOT mark questions as asked — use get_discovery_question or " +
+				"respond_and_ask to actually consume a question.",
+			{
+				current_topic: z
+					.string()
+					.describe("What the conversation is currently about (e.g. 'technical architecture', 'team dynamics')."),
+				questions_asked_so_far: z
+					.number()
+					.optional()
+					.describe("How many questions have been asked in the conversation so far. Helps calibrate pacing."),
+			},
+			async ({ current_topic, questions_asked_so_far }) => {
+				const topicLower = current_topic.toLowerCase();
+				const asked = questions_asked_so_far ?? 0;
+
+				// Score each category by relevance to current topic
+				const categoryScores: { category: string; score: number; unasked: DiscoveryQuestion[] }[] = [];
+
+				for (const [cat, questions] of Object.entries(DISCOVERY_QUESTIONS)) {
+					const unasked = questions.filter((q) => !this.askedQuestions.has(q.id));
+					if (unasked.length === 0) continue;
+
+					let score = 0;
+					const catWords = cat.replace(/_/g, " ").toLowerCase();
+
+					// Category name relevance
+					if (topicLower.includes(catWords) || catWords.includes(topicLower.split(" ")[0])) {
+						score += 3;
+					}
+
+					// Question content relevance
+					for (const q of unasked) {
+						const qText = (q.question + " " + q.why).toLowerCase();
+						const topicWords = topicLower.split(/\s+/).filter((w) => w.length > 3);
+						for (const w of topicWords) {
+							if (qText.includes(w)) score += 1;
+						}
+					}
+
+					categoryScores.push({ category: cat, score, unasked });
+				}
+
+				categoryScores.sort((a, b) => b.score - a.score);
+
+				// Build pacing advice
+				let pacing: string;
+				if (asked < 3) {
+					pacing = "Early in the conversation — focus on understanding the role and team before diving into specifics.";
+				} else if (asked < 8) {
+					pacing = "Mid-conversation — good time to ask about technical details and growth opportunities.";
+				} else {
+					pacing = "Later in the conversation — wrap up with logistics and any remaining priorities.";
+				}
+
+				const totalRemaining = Object.values(DISCOVERY_QUESTIONS)
+					.flat()
+					.filter((q) => !this.askedQuestions.has(q.id)).length;
+
+				const sections: string[] = [
+					`# Conversation Strategy`,
+					``,
+					`**Current topic:** ${current_topic}`,
+					`**Questions asked so far:** ${asked}`,
+					`**Discovery questions remaining:** ${totalRemaining}`,
+					``,
+					`## Pacing`,
+					pacing,
+					``,
+					`## Recommended Next Questions (by relevance)`,
+					``,
+				];
+
+				const topPicks = categoryScores.slice(0, 3);
+				if (topPicks.length === 0) {
+					sections.push("All discovery questions have been asked this session — no more suggestions.");
+				} else {
+					for (const pick of topPicks) {
+						const label = pick.category.replace(/_/g, " ").toUpperCase();
+						sections.push(`### ${label} (relevance: ${pick.score}, ${pick.unasked.length} remaining)`);
+						// Show top 2 unasked from this category
+						for (const q of pick.unasked.slice(0, 2)) {
+							sections.push(`  → "${q.question}"`);
+							sections.push(`    _Why: ${q.why}_`);
+						}
+						sections.push(``);
+					}
+				}
+
+				return { content: [{ type: "text", text: sections.join("\n") }] };
+			},
+		);
 	}
 }
 
